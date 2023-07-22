@@ -18,10 +18,8 @@ class MobileScannerController {
     this.torchEnabled = false,
     this.formats,
     this.returnImage = false,
-    @Deprecated(
-      'Instead, use the result of calling `start()` to determine if permissions were granted.',
-    )
-    this.onPermissionSet,
+    @Deprecated('Instead, use the result of calling `start()` to determine if permissions were granted.')
+        this.onPermissionSet,
     this.autoStart = true,
   });
 
@@ -65,8 +63,8 @@ class MobileScannerController {
 
   static const MethodChannel _methodChannel =
       MethodChannel('dev.steenbakker.mobile_scanner/scanner/method');
-  static const EventChannel _eventChannel =
-      EventChannel('dev.steenbakker.mobile_scanner/scanner/event');
+  static final Stream _eventChannel =
+      const EventChannel('dev.steenbakker.mobile_scanner/scanner/event').receiveBroadcastStream();
 
   @Deprecated(
     'Instead, use the result of calling `start()` to determine if permissions were granted.',
@@ -86,9 +84,6 @@ class MobileScannerController {
   /// A notifier that provides the state of which camera is being used
   late final ValueNotifier<CameraFacing> cameraFacingState =
       ValueNotifier(facing);
-
-  /// A notifier that provides zoomScale.
-  final ValueNotifier<double> zoomScaleState = ValueNotifier(0.0);
 
   bool isStarting = false;
 
@@ -155,9 +150,7 @@ class MobileScannerController {
       return null;
     }
 
-    events ??= _eventChannel
-        .receiveBroadcastStream()
-        .listen((data) => _handleEvent(data as Map));
+    events ??= _eventChannel.listen((data) => _handleEvent(data as Map));
 
     isStarting = true;
 
@@ -207,21 +200,9 @@ class MobileScannerController {
     } on PlatformException catch (error) {
       MobileScannerErrorCode errorCode = MobileScannerErrorCode.genericError;
 
-      final String? errorMessage = error.message;
-
-      if (kIsWeb) {
-        if (errorMessage == null) {
-          errorCode = MobileScannerErrorCode.genericError;
-        } else if (errorMessage.contains('NotFoundError') ||
-            errorMessage.contains('NotSupportedError')) {
-          errorCode = MobileScannerErrorCode.unsupported;
-        } else if (errorMessage.contains('NotAllowedError')) {
-          errorCode = MobileScannerErrorCode.permissionDenied;
-        } else {
-          errorCode = MobileScannerErrorCode.genericError;
-        }
+      if (error.code == "MobileScannerWeb") {
+        errorCode = MobileScannerErrorCode.permissionDenied;
       }
-
       isStarting = false;
 
       throw MobileScannerException(
@@ -310,9 +291,7 @@ class MobileScannerController {
   ///
   /// [path] The path of the image on the devices
   Future<bool> analyzeImage(String path) async {
-    events ??= _eventChannel
-        .receiveBroadcastStream()
-        .listen((data) => _handleEvent(data as Map));
+    events ??= _eventChannel.listen((data) => _handleEvent(data as Map));
 
     return _methodChannel
         .invokeMethod<bool>('analyzeImage', path)
@@ -335,11 +314,6 @@ class MobileScannerController {
     await _methodChannel.invokeMethod('setScale', zoomScale);
   }
 
-  /// Reset the zoomScale of the camera to use standard scale 1x.
-  Future<void> resetZoomScale() async {
-    await _methodChannel.invokeMethod('resetScale');
-  }
-
   /// Disposes the MobileScannerController and closes all listeners.
   ///
   /// If you call this, you cannot use this controller object anymore.
@@ -358,9 +332,6 @@ class MobileScannerController {
       case 'torchState':
         final state = TorchState.values[data as int? ?? 0];
         torchState.value = state;
-        break;
-      case 'zoomScaleState':
-        zoomScaleState.value = data as double? ?? 0.0;
         break;
       case 'barcode':
         if (data == null) return;
@@ -400,10 +371,6 @@ class MobileScannerController {
                   rawValue: barcode['rawValue'] as String?,
                   rawBytes: barcode['rawBytes'] as Uint8List?,
                   format: toFormat(barcode['format'] as int),
-                  corners: toCorners(
-                    (barcode['corners'] as List<Object?>? ?? [])
-                        .cast<Map<Object?, Object?>>(),
-                  ),
                 ),
             ],
           ),
