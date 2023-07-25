@@ -382,7 +382,7 @@ class MobileScannerController {
           errorDetails: MobileScannerErrorDetails(message: data as String?),
         );
       default:
-        throw UnimplementedError(name as String?);
+        print("UnimplementedError: ${name as String?}");
     }
   }
 
